@@ -1,6 +1,6 @@
 # PDF to DOCX Conversion Utilities
 
-This repository contains Python scripts for converting PDF files to DOCX documents with different functionalities. The scripts leverage libraries such as `PyMuPDF`, `Pillow`, `python-docx`, and optionally `Tesseract` for OCR (Optical Character Recognition).
+This repository contains Python scripts for converting PDF files to DOCX documents with different functionalities. The scripts leverage libraries such as `PyMuPDF`, `Pillow`, `python-docx`, and `Tesseract` for OCR (Optical Character Recognition).
 
 ## Project Structure
 
