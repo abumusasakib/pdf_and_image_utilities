@@ -33,7 +33,7 @@ This repository contains Python scripts for converting PDF files to DOCX documen
   - `python-docx`
   - `pytesseract` (for OCR functionality)
 
-### Additional Tools for OCR
+### Tools for OCR
 
 - **Tesseract OCR**:
   - Install Tesseract OCR from [Tesseract GitHub](https://github.com/tesseract-ocr/tesseract).
