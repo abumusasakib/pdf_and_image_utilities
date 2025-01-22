@@ -37,7 +37,6 @@ This repository contains Python scripts for converting PDF files to DOCX documen
 
 - **Tesseract OCR**:
   - Install Tesseract OCR from [Tesseract GitHub](https://github.com/tesseract-ocr/tesseract).
-  - Ensure `tesseract` is added to your system's PATH.
 
 ## Setup Instructions
 
@@ -63,7 +62,7 @@ This repository contains Python scripts for converting PDF files to DOCX documen
 
 4. **Set Up Tesseract (For OCR Functionality)**
    - Install Tesseract as described above.
-   - Configure the path in `pdf2docx_with_ocr.py`:
+   - Configure the path in `pdf2docx_with_ocr.py` and `pdf2docx.py`:
 
      ```python
      pytesseract.pytesseract.tesseract_cmd = r'path_to_tesseract_executable'
@@ -99,7 +98,7 @@ This repository contains Python scripts for converting PDF files to DOCX documen
 
 1. **Tesseract Not Found**:
    - Ensure Tesseract is installed and added to your system's PATH.
-   - Check if the correct path is configured in `pdf2docx_with_ocr.py`.
+   - Check if the correct path is configured in `pdf2docx_with_ocr.py` and `pdf2docx.py`.
 
 2. **Missing Dependencies**:
    - Reinstall the required libraries:
