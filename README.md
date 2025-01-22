@@ -15,7 +15,7 @@ This repository contains Python scripts for converting PDF files to DOCX documen
 
 ## Features
 
-1. **Basic Conversion (`pdf2docx.py`)**
+1. **Conversion via GUI (`pdf2docx.py`)**
    Converts PDF files to DOCX via a full-fledged graphical user interface.
 
 2. **Centered Images Conversion (`pdf2docx_centered_images.py`)**
