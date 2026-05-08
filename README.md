@@ -7,8 +7,8 @@ This repository contains Python scripts for working with PDF files, DOCX documen
 ```text
 .
 ├── image_overlay_under_pdf.py  # Overlay an image under the content of PDF pages
-├── pdf2jpg.py                  # Convert PDF pages to JPG images
-├── md2pdf.py                   # Convert Markdown to PDF
+├── pdf2jpg.py                  # Convert PDF to JPG images (GUI, Drag-and-Drop)
+├── pdf_md_convert.py           # Bidirectional PDF <-> Markdown converter (GUI)
 ├── pdf2docx.py                 # PDF to DOCX conversion using a graphical user interface
 ├── pdf2docx_centered_images.py # PDF to DOCX conversion with centered page images
 ├── pdf2docx_with_ocr.py        # PDF to DOCX conversion with OCR text extraction
@@ -26,7 +26,10 @@ This repository contains Python scripts for working with PDF files, DOCX documen
 
 2. **PDF to JPG Conversion (`pdf2jpg.py`)**
 
-   - Converts each page of a PDF file into a separate JPG image.
+   - A modern GUI application to convert PDF pages into high-resolution JPG images.
+   - **Drag-and-Drop**: Simply drag your PDF into the window to start conversion.
+   - **No Dependencies**: Uses PyMuPDF for a fast, dependency-free, cross-platform experience (no Poppler required).
+   - **Auto-Archiving**: Automatically creates a ZIP archive of all generated images.
 
 3. **Conversion via GUI (`pdf2docx.py`)**
 
@@ -39,27 +42,28 @@ This repository contains Python scripts for working with PDF files, DOCX documen
 5. **OCR-Based Conversion (`pdf2docx_with_ocr.py`)**
    - Uses Tesseract OCR to extract text from scanned or image-based PDFs and saves it to a DOCX file.
 
-6. **Markdown to PDF Conversion (`md2pdf.py`)**
-   - Converts a Markdown document into a high-quality PDF with a table of contents, custom CSS styling, and proper metadata using the `markdown-pdf` library.
+6. **Bidirectional PDF & Markdown Conversion (`pdf_md_convert.py`)**
+   - A versatile GUI tool that converts between PDF and Markdown formats.
+   - **Markdown to PDF**: Renders styled PDFs with Table of Contents and custom CSS.
+   - **PDF to Markdown**: Uses `pymupdf4llm` to extract structure and text into high-quality Markdown.
+   - **Drag-and-Drop**: Automatically detects the file type and switches to the correct conversion mode.
 
-   This utility (`md2pdf.py`) allows you to:
-   - Render structured Markdown (including headings, lists, links, code blocks, and tables) into a styled PDF.
-   - Embed custom CSS for layout and typography control.
-   - Automatically include a **Table of Contents (TOC)** as bookmarks.
-   - Define document metadata (title, author).
-   - Ideal for generating user manuals or documentation PDFs from Markdown source files.
+   This utility allows you to:
+   - Render structured Markdown into a styled PDF with bookmarks.
+   - Extract content from PDFs into editable Markdown for LLMs or documentation.
+   - Ideal for generating manuals or converting research papers into readable Markdown.
 
    **Quick Start:**
-   1. Install the library:
+   1. Install the required libraries:
 
       ```bash
-      pip install markdown-pdf
+      pip install markdown-pdf pymupdf4llm PyQt6
       ```
 
    2. Run the script:
 
       ```bash
-      python md2pdf.py
+      python pdf_md_convert.py
       ```
 
 ---
@@ -69,11 +73,11 @@ This repository contains Python scripts for working with PDF files, DOCX documen
 | Script                         | Description                                                    | How to Run                            |
 |-------------------------------|----------------------------------------------------------------|----------------------------------------|
 | `image_overlay_under_pdf.py`  | Overlay an image **beneath** PDF page content (preserving aspect ratio) | `python image_overlay_under_pdf.py`   |
-| `pdf2jpg.py`                  | Convert each PDF page into a high-resolution **JPG image**     | `python pdf2jpg.py`                   |
+| `pdf2jpg.py`                  | **GUI Tool**: Convert PDF pages to JPGs with drag-and-drop support | `python pdf2jpg.py`                   |
 | `pdf2docx.py`                 | Convert PDF to **editable DOCX** using a graphical interface   | `python pdf2docx.py`                  |
 | `pdf2docx_centered_images.py` | Convert PDF pages into **centered images** inside a DOCX file  | `python pdf2docx_centered_images.py`  |
 | `pdf2docx_with_ocr.py`        | Convert scanned PDFs to DOCX with **OCR-extracted text**       | `python pdf2docx_with_ocr.py`         |
-| `md2pdf.py`                   | Convert Markdown files into **styled, high-quality PDFs** with TOC | `python md2pdf.py`                    |
+| `pdf_md_convert.py`           | **GUI Tool**: Bidirectional **PDF <-> Markdown** conversion    | `python pdf_md_convert.py`            |
 
 ---
 
@@ -81,11 +85,13 @@ This repository contains Python scripts for working with PDF files, DOCX documen
 
 - Python 3.7 or later
 - The following Python libraries:
-  - `fitz` (PyMuPDF)
+  - `PyQt6` (for GUI functionality)
+  - `pymupdf` (fitz)
+  - `pymupdf4llm` (for PDF to Markdown extraction)
   - `Pillow`
   - `python-docx`
   - `pytesseract` (for OCR functionality)
-  - `markdown-pdf` (for Markdown conversion)
+  - `markdown-pdf` (for Markdown to PDF conversion)
 
 ### Additional Tools for OCR
 

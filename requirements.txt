@@ -1,0 +1,7 @@
+PyQt6
+pymupdf
+pymupdf4llm
+Pillow
+python-docx
+pytesseract
+markdown-pdf

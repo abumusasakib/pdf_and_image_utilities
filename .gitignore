@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+bin/
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+
+# Project specific outputs
+*_images/
+*.zip
+*.docx
+*.pdf
+!poppler-wsl.pdf  # Keep the example PDF
+!poppler-wsl.docx # Keep the example DOCX
+*.md
+!facebook_pixel_flutter.md # Keep example MD
+!README.md
