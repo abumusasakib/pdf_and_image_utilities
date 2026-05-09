@@ -5,38 +5,49 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QFileDialog, QMessageBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QColor, QPalette
-from markdown_pdf import MarkdownPdf, Section
-import pymupdf4llm
 
 class ConverterThread(QThread):
     progress = pyqtSignal(int, str)
     finished = pyqtSignal(bool, str, str) # success, message, file_path
 
-    def __init__(self, input_file):
+    def __init__(self, input_files):
         super().__init__()
-        self.input_file = input_file
+        self.input_files = input_files
 
     def run(self):
         try:
-            ext = os.path.splitext(self.input_file)[1].lower()
+            total_files = len(self.input_files)
+            last_file_path = ""
             
-            if ext == ".md":
-                self.convert_md_to_pdf()
-            elif ext == ".pdf":
-                self.convert_pdf_to_md()
-            else:
-                self.finished.emit(False, "Unsupported file format. Please drop a .pdf or .md file.", "")
+            for file_idx, input_file in enumerate(self.input_files):
+                base_msg = f"[{file_idx + 1}/{total_files}] {os.path.basename(input_file)}"
+                ext = os.path.splitext(input_file)[1].lower()
+                
+                # Calculate base progress for this file
+                base_progress = int((file_idx / total_files) * 100)
+                self.progress.emit(base_progress, f"{base_msg}: Starting...")
+
+                if ext == ".md":
+                    self.convert_md_to_pdf(input_file, base_progress, 100 // total_files, base_msg)
+                elif ext == ".pdf":
+                    self.convert_pdf_to_md(input_file, base_progress, 100 // total_files, base_msg)
+                
+                last_file_path = input_file
+
+            self.progress.emit(100, "Done!")
+            self.finished.emit(True, f"Successfully processed {total_files} file(s).", os.path.dirname(last_file_path))
 
         except Exception as e:
             self.finished.emit(False, str(e), "")
 
-    def convert_md_to_pdf(self):
-        self.progress.emit(20, "Reading Markdown...")
-        with open(self.input_file, "r", encoding="utf-8") as f:
+    def convert_md_to_pdf(self, input_file, base_prog, step_prog, base_msg):
+        from markdown_pdf import MarkdownPdf, Section
+        self.progress.emit(base_prog + int(step_prog * 0.2), f"{base_msg}: Reading Markdown...")
+        with open(input_file, "r", encoding="utf-8") as f:
             content = f.read()
         
-        output_file = os.path.splitext(self.input_file)[0] + ".pdf"
-        self.progress.emit(50, "Rendering PDF...")
+        output_file = os.path.splitext(input_file)[0] + ".pdf"
+        self.progress.emit(base_prog + int(step_prog * 0.5), f"{base_msg}: Rendering PDF...")
         
         pdf = MarkdownPdf(toc_level=2, optimize=True)
         pdf.add_section(
@@ -48,26 +59,20 @@ class ConverterThread(QThread):
             """
         )
         pdf.save(output_file)
-        
-        self.progress.emit(100, "Done!")
-        self.finished.emit(True, f"Converted Markdown to PDF successfully.\nSaved as: {os.path.basename(output_file)}", output_file)
 
-    def convert_pdf_to_md(self):
-        self.progress.emit(30, "Analyzing PDF structure...")
-        output_file = os.path.splitext(self.input_file)[0] + ".md"
+    def convert_pdf_to_md(self, input_file, base_prog, step_prog, base_msg):
+        import pymupdf4llm
+        self.progress.emit(base_prog + int(step_prog * 0.3), f"{base_msg}: Analyzing PDF...")
+        output_file = os.path.splitext(input_file)[0] + ".md"
         
-        self.progress.emit(60, "Extracting text as Markdown...")
-        # pymupdf4llm provides high-quality markdown extraction
-        md_text = pymupdf4llm.to_markdown(self.input_file)
+        self.progress.emit(base_prog + int(step_prog * 0.6), f"{base_msg}: Extracting Text...")
+        md_text = pymupdf4llm.to_markdown(input_file)
         
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(md_text)
-            
-        self.progress.emit(100, "Done!")
-        self.finished.emit(True, f"Converted PDF to Markdown successfully.\nSaved as: {os.path.basename(output_file)}", output_file)
 
 class DropZone(QFrame):
-    fileDropped = pyqtSignal(str)
+    filesDropped = pyqtSignal(list)
 
     def __init__(self):
         super().__init__()
@@ -76,7 +81,7 @@ class DropZone(QFrame):
         self.setObjectName("DropZone")
         
         layout = QVBoxLayout(self)
-        self.label = QLabel("Drag & Drop PDF or Markdown here\nor click to browse")
+        self.label = QLabel("Drag & Drop PDF or Markdown file(s) here\nor click to browse")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setStyleSheet("color: #888; font-size: 16px; font-weight: bold;")
         layout.addWidget(self.label)
@@ -98,9 +103,8 @@ class DropZone(QFrame):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            url = event.mimeData().urls()[0].toLocalFile()
-            ext = os.path.splitext(url)[1].lower()
-            if ext in [".pdf", ".md"]:
+            urls = event.mimeData().urls()
+            if any(os.path.splitext(url.toLocalFile())[1].lower() in [".pdf", ".md"] for url in urls):
                 event.accept()
                 self.setStyleSheet(self.hover_style)
                 return
@@ -111,13 +115,14 @@ class DropZone(QFrame):
 
     def dropEvent(self, event: QDropEvent):
         self.setStyleSheet(self.default_style)
-        file_path = event.mimeData().urls()[0].toLocalFile()
-        self.fileDropped.emit(file_path)
+        files = [url.toLocalFile() for url in event.mimeData().urls() if os.path.splitext(url.toLocalFile())[1].lower() in [".pdf", ".md"]]
+        if files:
+            self.filesDropped.emit(files)
 
     def mousePressEvent(self, event):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Supported Files (*.pdf *.md)")
-        if file_path:
-            self.fileDropped.emit(file_path)
+        files, _ = QFileDialog.getOpenFileNames(self, "Open File(s)", "", "Supported Files (*.pdf *.md)")
+        if files:
+            self.filesDropped.emit(files)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -140,7 +145,7 @@ class MainWindow(QMainWindow):
 
         # Drop Zone
         self.drop_zone = DropZone()
-        self.drop_zone.fileDropped.connect(self.start_conversion)
+        self.drop_zone.filesDropped.connect(self.start_conversion)
         self.layout.addWidget(self.drop_zone)
 
         # Progress Area
@@ -175,16 +180,16 @@ class MainWindow(QMainWindow):
         # Success Buttons
         self.buttons_container = QWidget()
         self.buttons_layout = QHBoxLayout(self.buttons_container)
-        self.btn_open_file = QPushButton("Open File")
-        self.btn_open_file.clicked.connect(self.open_file)
+        self.btn_open_folder = QPushButton("Open Folder")
+        self.btn_open_folder.clicked.connect(self.open_output_folder)
         self.btn_reset = QPushButton("Convert Another")
         self.btn_reset.clicked.connect(self.reset_ui)
-        self.buttons_layout.addWidget(self.btn_open_file)
+        self.buttons_layout.addWidget(self.btn_open_folder)
         self.buttons_layout.addWidget(self.btn_reset)
         self.layout.addWidget(self.buttons_container)
         self.buttons_container.hide()
 
-        self.last_output_file = ""
+        self.last_output_dir = ""
         self.set_dark_theme()
 
     def set_dark_theme(self):
@@ -211,13 +216,13 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #444; }
         """)
 
-    def start_conversion(self, file_path):
+    def start_conversion(self, files):
         self.drop_zone.hide()
         self.progress_container.show()
-        self.status_label.setText(f"Processing: {os.path.basename(file_path)}")
+        self.status_label.setText(f"Preparing {len(files)} file(s)...")
         self.progress_bar.setValue(0)
         
-        self.thread = ConverterThread(file_path)
+        self.thread = ConverterThread(files)
         self.thread.progress.connect(self.update_progress)
         self.thread.finished.connect(self.conversion_finished)
         self.thread.start()
@@ -226,9 +231,9 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(val)
         self.status_label.setText(msg)
 
-    def conversion_finished(self, success, message, file_path):
+    def conversion_finished(self, success, message, folder_path):
         if success:
-            self.last_output_file = file_path
+            self.last_output_dir = folder_path
             self.status_label.setText("Conversion Complete!")
             self.buttons_container.show()
             QMessageBox.information(self, "Success", message)
@@ -236,9 +241,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Conversion failed:\n{message}")
             self.reset_ui()
 
-    def open_file(self):
-        if self.last_output_file and os.path.exists(self.last_output_file):
-            os.startfile(self.last_output_file)
+    def open_output_folder(self):
+        if self.last_output_dir and os.path.exists(self.last_output_dir):
+            os.startfile(self.last_output_dir)
 
     def reset_ui(self):
         self.buttons_container.hide()

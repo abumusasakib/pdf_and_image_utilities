@@ -1,7 +1,6 @@
 import sys
 import os
 import zipfile
-import fitz  # PyMuPDF
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QLabel, QProgressBar, QFrame, QPushButton, QHBoxLayout,
                              QFileDialog, QMessageBox)
@@ -12,55 +11,61 @@ class PDFConverterThread(QThread):
     progress = pyqtSignal(int, str)
     finished = pyqtSignal(bool, str, str) # success, message, folder_path
 
-    def __init__(self, pdf_file):
+    def __init__(self, pdf_files):
         super().__init__()
-        self.pdf_file = pdf_file
+        self.pdf_files = pdf_files
 
     def run(self):
         try:
-            # Create a directory to store the JPG files
-            output_dir = os.path.splitext(self.pdf_file)[0] + "_images"
-            os.makedirs(output_dir, exist_ok=True)
-
-            self.progress.emit(0, "Opening PDF...")
-
-            # Open the PDF using PyMuPDF (no external dependency needed)
-            doc = fitz.open(self.pdf_file)
-            total_pages = len(doc)
-
-            # Save each page as a JPG file
-            for i in range(total_pages):
-                page = doc.load_page(i)
-                # You can increase the matrix for better resolution if needed:
-                # pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) 
-                pix = page.get_pixmap()
+            import fitz  # Lazy load
+            total_files = len(self.pdf_files)
+            last_output_dir = ""
+            
+            for file_idx, pdf_file in enumerate(self.pdf_files):
+                base_msg = f"[{file_idx + 1}/{total_files}] {os.path.basename(pdf_file)}"
+                self.progress.emit(int((file_idx / total_files) * 100), f"{base_msg}: Opening...")
                 
-                image_path = os.path.join(output_dir, f"page_{i + 1}.jpg")
-                pix.save(image_path)
-                
-                percent = int(((i + 1) / total_pages) * 85) # 85% for conversion
-                self.progress.emit(percent, f"Converting page {i + 1} of {total_pages}...")
+                # Create a directory to store the JPG files
+                output_dir = os.path.splitext(pdf_file)[0] + "_images"
+                os.makedirs(output_dir, exist_ok=True)
+                last_output_dir = output_dir
 
-            doc.close()
+                # Open the PDF using PyMuPDF
+                doc = fitz.open(pdf_file)
+                total_pages = len(doc)
 
-            # Archive images into a zip file
-            self.progress.emit(90, "Archiving images...")
-            zip_filename = os.path.splitext(self.pdf_file)[0] + "_images.zip"
-            with zipfile.ZipFile(zip_filename, 'w') as zipf:
-                for root, _, files in os.walk(output_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, output_dir)
-                        zipf.write(file_path, arcname=arcname)
+                # Save each page as a JPG file
+                for i in range(total_pages):
+                    page = doc.load_page(i)
+                    pix = page.get_pixmap()
+                    image_path = os.path.join(output_dir, f"page_{i + 1}.jpg")
+                    pix.save(image_path)
+                    
+                    # Calculate progress: current file contribution + current page contribution
+                    file_progress = (file_idx / total_files) * 100
+                    page_progress = ((i + 1) / total_pages) * (100 / total_files) * 0.8 # 80% for conversion
+                    self.progress.emit(int(file_progress + page_progress), f"{base_msg}: Page {i+1}/{total_pages}")
+
+                doc.close()
+
+                # Archive images into a zip file
+                self.progress.emit(int(file_progress + (100/total_files)*0.9), f"{base_msg}: Archiving...")
+                zip_filename = os.path.splitext(pdf_file)[0] + "_images.zip"
+                with zipfile.ZipFile(zip_filename, 'w') as zipf:
+                    for root, _, files in os.walk(output_dir):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.relpath(file_path, output_dir)
+                            zipf.write(file_path, arcname=arcname)
 
             self.progress.emit(100, "Done!")
-            self.finished.emit(True, f"Successfully converted {total_pages} pages.\nArchived to: {os.path.basename(zip_filename)}", output_dir)
+            self.finished.emit(True, f"Successfully converted {total_files} PDF(s).", os.path.dirname(self.pdf_files[0]))
 
         except Exception as e:
             self.finished.emit(False, str(e), "")
 
 class DropZone(QFrame):
-    fileDropped = pyqtSignal(str)
+    filesDropped = pyqtSignal(list)
 
     def __init__(self):
         super().__init__()
@@ -69,7 +74,7 @@ class DropZone(QFrame):
         self.setObjectName("DropZone")
         
         layout = QVBoxLayout(self)
-        self.label = QLabel("Drag & Drop PDF here\nor click to browse")
+        self.label = QLabel("Drag & Drop PDF(s) here\nor click to browse")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setStyleSheet("color: #888; font-size: 16px; font-weight: bold;")
         layout.addWidget(self.label)
@@ -91,8 +96,8 @@ class DropZone(QFrame):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            url = event.mimeData().urls()[0].toLocalFile()
-            if url.lower().endswith(".pdf"):
+            urls = event.mimeData().urls()
+            if any(url.toLocalFile().lower().endswith(".pdf") for url in urls):
                 event.accept()
                 self.setStyleSheet(self.hover_style)
                 return
@@ -103,13 +108,14 @@ class DropZone(QFrame):
 
     def dropEvent(self, event: QDropEvent):
         self.setStyleSheet(self.default_style)
-        file_path = event.mimeData().urls()[0].toLocalFile()
-        self.fileDropped.emit(file_path)
+        files = [url.toLocalFile() for url in event.mimeData().urls() if url.toLocalFile().lower().endswith(".pdf")]
+        if files:
+            self.filesDropped.emit(files)
 
     def mousePressEvent(self, event):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open PDF", "", "PDF Files (*.pdf)")
-        if file_path:
-            self.fileDropped.emit(file_path)
+        files, _ = QFileDialog.getOpenFileNames(self, "Open PDF(s)", "", "PDF Files (*.pdf)")
+        if files:
+            self.filesDropped.emit(files)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -132,7 +138,7 @@ class MainWindow(QMainWindow):
 
         # Drop Zone
         self.drop_zone = DropZone()
-        self.drop_zone.fileDropped.connect(self.start_conversion)
+        self.drop_zone.filesDropped.connect(self.start_conversion)
         self.layout.addWidget(self.drop_zone)
 
         # Progress Area
@@ -204,13 +210,13 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #444; }
         """)
 
-    def start_conversion(self, file_path):
+    def start_conversion(self, files):
         self.drop_zone.hide()
         self.progress_container.show()
-        self.status_label.setText(f"Processing: {os.path.basename(file_path)}")
+        self.status_label.setText(f"Preparing {len(files)} file(s)...")
         self.progress_bar.setValue(0)
         
-        self.thread = PDFConverterThread(file_path)
+        self.thread = PDFConverterThread(files)
         self.thread.progress.connect(self.update_progress)
         self.thread.finished.connect(self.conversion_finished)
         self.thread.start()
